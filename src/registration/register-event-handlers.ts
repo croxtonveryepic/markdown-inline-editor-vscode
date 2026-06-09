@@ -12,7 +12,7 @@ export function registerEventHandlers(
       decorator.setActiveEditor(editor);
     }),
     vscode.window.onDidChangeTextEditorSelection((event) => {
-      decorator.updateDecorationsForSelection(event.kind);
+      decorator.onSelectionChange(event.kind);
     }),
     vscode.workspace.onDidChangeTextDocument((event) => {
       if (event.document === vscode.window.activeTextEditor?.document) {

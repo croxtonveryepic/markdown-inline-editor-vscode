@@ -16,6 +16,7 @@ import { filterDecorationsForEditor, ScopeEntry } from './decorator/visibility-m
 import { handleCheckboxClick } from './decorator/checkbox-toggle';
 import { MermaidDiagramDecorations } from './decorator/mermaid-diagram-decorations';
 import { DecoratorUpdateScheduler } from './decorator/update-scheduler';
+import { SelectionUpdateThrottle } from './decorator/selection-update-throttle';
 import { MathDecorations } from './math/math-decorations';
 import { MermaidHoverIndicatorDecorationType } from './decorations';
 import { isSupportedMarkdownLanguage } from './language-support';
@@ -29,6 +30,10 @@ const PERFORMANCE_CONSTANTS = {
   DEBOUNCE_TIMEOUT_MS: 150,
   IDLE_CALLBACK_TIMEOUT_MS: 300,
   MERMAID_MAX_CONCURRENCY: 4,
+  // Selection-change coalescing: the cooldown auto-tunes between these bounds to
+  // the measured cost of the previous decoration pass (see SelectionUpdateThrottle).
+  SELECTION_THROTTLE_MIN_MS: 16,
+  SELECTION_THROTTLE_MAX_MS: 250,
 } as const;
 
 
@@ -72,6 +77,10 @@ export class Decorator {
   private mermaidHoverIndicatorDecorationType = MermaidHoverIndicatorDecorationType();
   private readonly fileDecorationState: FileDecorationStateStore;
   private readonly updateScheduler: DecoratorUpdateScheduler;
+  private readonly selectionThrottle = new SelectionUpdateThrottle(
+    PERFORMANCE_CONSTANTS.SELECTION_THROTTLE_MIN_MS,
+    PERFORMANCE_CONSTANTS.SELECTION_THROTTLE_MAX_MS
+  );
 
   constructor(parseCache: MarkdownParseCache, workspaceState?: Memento) {
     this.parseCache = parseCache;
@@ -116,6 +125,8 @@ export class Decorator {
    */
   setActiveEditor(textEditor: TextEditor | undefined) {
     this.updateScheduler.cancel();
+    // Drop any selection update still pending for the previous editor.
+    this.selectionThrottle.cancel();
 
     if (!textEditor) {
       return;
@@ -154,6 +165,35 @@ export class Decorator {
 
     // Immediate update without debounce for selection changes
     this.updateDecorationsInternal();
+  }
+
+  /**
+   * Hot path for editor selection changes (cursor movement).
+   *
+   * Coalesces rapid events — most importantly a held arrow key — through an
+   * auto-tuning throttle, so the O(document) decoration pass runs at most once
+   * per pass-worth of time at the latest cursor position instead of once per
+   * raw event. A single discrete move still updates immediately (leading edge).
+   * Checkbox toggles from a mouse click are handled inline so they stay
+   * responsive and are never coalesced away.
+   *
+   * @param kind - The kind of selection change (Mouse, Keyboard, or Command)
+   */
+  onSelectionChange(kind?: TextEditorSelectionChangeKind): void {
+    if (!this.activeEditor || !this.isMarkdownDocument()) {
+      return;
+    }
+
+    if (kind === TextEditorSelectionChangeKind.Mouse && handleCheckboxClick(this.activeEditor)) {
+      return;
+    }
+
+    this.selectionThrottle.run(() => {
+      // The active editor / document may have changed during the cooldown window.
+      if (this.activeEditor && this.isMarkdownDocument()) {
+        this.updateDecorationsInternal();
+      }
+    });
   }
 
   // Checkbox behavior lives in decorator/checkbox-toggle.ts
@@ -652,6 +692,7 @@ export class Decorator {
    */
   dispose() {
     this.updateScheduler.dispose();
+    this.selectionThrottle.dispose();
     this.decorationTypes.dispose();
     this.mermaidHoverIndicatorDecorationType.dispose();
   }

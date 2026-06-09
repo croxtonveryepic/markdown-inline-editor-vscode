@@ -64,6 +64,7 @@ Before making changes:
 - `decorator/decoration-categories.ts` - Categorizes decoration types
 - `decorator/file-decoration-state.ts` - Persists and migrates per-file enable/disable state
 - `decorator/update-scheduler.ts` - Debounced and idle update scheduling
+- `decorator/selection-update-throttle.ts` - Coalesces rapid selection-change events (e.g. a held arrow key) so the decoration pass runs at most once per pass-worth of time
 - `decorator/editor-decoration-applier.ts` - Range creation, scope entry building, and decoration application helpers
 - `decorator/mermaid-update-coordinator.ts` - Async Mermaid rendering and decoration coordination
 

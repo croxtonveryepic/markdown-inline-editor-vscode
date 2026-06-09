@@ -10,6 +10,7 @@ describe('registerEventHandlers', () => {
   it('registers editor, workspace, and theme listeners', () => {
     const decorator = {
       setActiveEditor: vi.fn(),
+      onSelectionChange: vi.fn(),
       updateDecorationsForSelection: vi.fn(),
       updateDecorationsFromChange: vi.fn(),
       renameFile: vi.fn(),
@@ -69,6 +70,7 @@ describe('registerEventHandlers', () => {
 
     const decorator = {
       setActiveEditor: vi.fn(),
+      onSelectionChange: vi.fn(),
       updateDecorationsForSelection: vi.fn(),
       updateDecorationsFromChange: vi.fn(),
       renameFile: vi.fn(),
@@ -90,7 +92,7 @@ describe('registerEventHandlers', () => {
     });
 
     expect(decorator.setActiveEditor).toHaveBeenCalledWith(editor);
-    expect(decorator.updateDecorationsForSelection).toHaveBeenCalledWith(
+    expect(decorator.onSelectionChange).toHaveBeenCalledWith(
       vscode.TextEditorSelectionChangeKind.Mouse
     );
     expect(decorator.updateDecorationsFromChange).toHaveBeenCalledWith({ document });
@@ -117,6 +119,7 @@ describe('registerEventHandlers', () => {
 
     const decorator = {
       setActiveEditor: vi.fn(),
+      onSelectionChange: vi.fn(),
       updateDecorationsForSelection: vi.fn(),
       updateDecorationsFromChange: vi.fn(),
       renameFile: vi.fn(),

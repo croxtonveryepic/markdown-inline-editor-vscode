@@ -1049,9 +1049,10 @@ suite('Extension E2E', () => {
   // ranges — catching bugs where parsing is fine but rendering is silently
   // broken (e.g. applyDecorations() short-circuits, wrong guard, etc.).
   //
-  // updateDecorationsForSelection() is synchronous (no debounce), so a
-  // cursor-move is enough to trigger a fresh setDecorations cycle that the
-  // spy can observe within a short delay.
+  // The selection hot path is coalesced (SelectionUpdateThrottle), but the
+  // first move after an idle period runs on the leading edge, so a single
+  // cursor-move still triggers a fresh setDecorations cycle that the spy can
+  // observe within a short delay.
 
   test('decorator applies non-empty ranges for markdown content (onApply hook)', async () => {
     assert.ok(decoratorApi, 'decorator not available from ext.exports');
@@ -1066,8 +1067,8 @@ suite('Extension E2E', () => {
     decoratorApi.onApply = (count) => { nonEmptyTypeCount += count; };
 
     try {
-      // cursorMove → onDidChangeTextEditorSelection → updateDecorationsForSelection
-      // → updateDecorationsInternal (synchronous) → applyDecorations → onApply
+      // cursorMove → onDidChangeTextEditorSelection → onSelectionChange
+      // → (throttle, leading edge) → updateDecorationsInternal → applyDecorations → onApply
       await vscode.commands.executeCommand('cursorMove', { to: 'right' });
       await delay(300);
       assert.ok(
