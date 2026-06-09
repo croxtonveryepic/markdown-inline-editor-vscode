@@ -13,6 +13,7 @@ import { FileDecorationStateStore } from './decorator/file-decoration-state';
 import { MermaidUpdateCoordinator } from './decorator/mermaid-update-coordinator';
 import { DecorationTypeRegistry } from './decorator/decoration-type-registry';
 import { filterDecorationsForEditor, ScopeEntry } from './decorator/visibility-model';
+import { computeRenderWindow, type RenderWindow } from './decorator/viewport-window';
 import { handleCheckboxClick } from './decorator/checkbox-toggle';
 import { MermaidDiagramDecorations } from './decorator/mermaid-diagram-decorations';
 import { DecoratorUpdateScheduler } from './decorator/update-scheduler';
@@ -188,6 +189,34 @@ export class Decorator {
       return;
     }
 
+    this.scheduleViewportRefresh();
+  }
+
+  /**
+   * Hot path for viewport changes (scrolling).
+   *
+   * Decorations are scoped to the visible viewport (plus one page of pre-render
+   * margin above and below — see {@link computeRenderWindow}), so scrolling must
+   * recompute which decorations are in view. Scroll events fire as rapidly as a
+   * held arrow key, so they are coalesced through the same auto-tuning throttle
+   * as selection changes: a pass can never queue faster than it finishes.
+   */
+  onVisibleRangesChange(): void {
+    if (!this.activeEditor || !this.isMarkdownDocument()) {
+      return;
+    }
+
+    this.scheduleViewportRefresh();
+  }
+
+  /**
+   * Coalesces a "same content, viewport/selection changed" refresh through the
+   * selection throttle. Shared by selection and scroll hot paths so neither can
+   * outrun the cost of a decoration pass.
+   *
+   * @private
+   */
+  private scheduleViewportRefresh(): void {
     this.selectionThrottle.run(() => {
       // The active editor / document may have changed during the cooldown window.
       if (this.activeEditor && this.isMarkdownDocument()) {
@@ -357,9 +386,15 @@ export class Decorator {
       return; // Document changed during parse, skip this update
     }
 
+    // Scope decorations to the viewport (plus one page above/below). null means
+    // the whole document fits the window, so everything is rendered as before.
+    const renderWindow = this.activeEditor
+      ? computeRenderWindow(this.activeEditor, text)
+      : null;
+
     // Filter decorations based on selections (pass original text for offset adjustment)
     const filterStart = Date.now();
-    const filtered = this.filterDecorations(decorations, scopes, text);
+    const filtered = this.filterDecorations(decorations, scopes, text, renderWindow);
     const filterDurationMs = Date.now() - filterStart;
 
     // Apply decorations
@@ -384,6 +419,7 @@ export class Decorator {
         mermaidBlocks: mermaidBlocks.length,
         mathRegions: mathRegions.length,
         filteredDecorationTypes: filtered.size,
+        viewportScoped: renderWindow !== null,
       });
     }
   }
@@ -519,7 +555,8 @@ export class Decorator {
   private filterDecorations(
     decorations: DecorationRange[],
     scopes: ScopeEntry[],
-    originalText: string
+    originalText: string,
+    renderWindow?: RenderWindow | null
   ): Map<DecorationType, Array<Range | DecorationOptions>> {
     if (!this.activeEditor) {
       return new Map();
@@ -530,7 +567,8 @@ export class Decorator {
       decorations,
       scopes,
       originalText,
-      (startPos, endPos, text) => this.createRange(startPos, endPos, text)
+      (startPos, endPos, text) => this.createRange(startPos, endPos, text),
+      renderWindow
     );
   }
 

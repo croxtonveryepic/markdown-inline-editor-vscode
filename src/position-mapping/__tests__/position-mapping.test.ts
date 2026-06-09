@@ -1,4 +1,4 @@
-import { mapNormalizedToOriginal, normalizeAnchorText, normalizeToLF } from '../../position-mapping';
+import { mapNormalizedToOriginal, mapOriginalToNormalized, normalizeAnchorText, normalizeToLF } from '../../position-mapping';
 
 describe('mapNormalizedToOriginal', () => {
   describe('LF-only documents (no CRLF)', () => {
@@ -52,6 +52,58 @@ describe('mapNormalizedToOriginal', () => {
     it('returns originalText.length for out-of-range position', () => {
       const original = 'A\r\nB';
       expect(mapNormalizedToOriginal(99, original)).toBe(original.length);
+    });
+  });
+});
+
+describe('mapOriginalToNormalized', () => {
+  describe('LF-only documents (no CRLF)', () => {
+    it('returns the same position when no CRLF present', () => {
+      const text = 'Hello\nWorld';
+      expect(mapOriginalToNormalized(0, text)).toBe(0);
+      expect(mapOriginalToNormalized(5, text)).toBe(5);
+      expect(mapOriginalToNormalized(6, text)).toBe(6);
+    });
+
+    it('returns originalPos when originalText is undefined', () => {
+      expect(mapOriginalToNormalized(7, undefined)).toBe(7);
+    });
+  });
+
+  describe('CRLF documents', () => {
+    // "AB\r\nCD" — normalized: "AB\nCD" (len=5), original: "AB\r\nCD" (len=6)
+    // Original:    A=0  B=1  \r=2  \n=3  C=4  D=5
+    // Normalized:  A=0  B=1  \n=2  C=3  D=4
+
+    it('maps positions before the CRLF correctly', () => {
+      const original = 'AB\r\nCD';
+      expect(mapOriginalToNormalized(0, original)).toBe(0); // A
+      expect(mapOriginalToNormalized(1, original)).toBe(1); // B
+      expect(mapOriginalToNormalized(2, original)).toBe(2); // \r (no \r counted yet)
+    });
+
+    it('maps positions after the CRLF with -1 offset per CRLF', () => {
+      const original = 'AB\r\nCD';
+      expect(mapOriginalToNormalized(4, original)).toBe(3); // C
+      expect(mapOriginalToNormalized(5, original)).toBe(4); // D
+    });
+
+    it('handles multiple CRLF sequences', () => {
+      // "A\r\nB\r\nC"
+      // Orig: A=0 \r=1 \n=2 B=3 \r=4 \n=5 C=6
+      // Norm: A=0 \n=1 B=2 \n=3 C=4
+      const original = 'A\r\nB\r\nC';
+      expect(mapOriginalToNormalized(0, original)).toBe(0); // A
+      expect(mapOriginalToNormalized(3, original)).toBe(2); // B (one \r removed)
+      expect(mapOriginalToNormalized(6, original)).toBe(4); // C (two \r removed)
+    });
+
+    it('round-trips with mapNormalizedToOriginal for content positions', () => {
+      const original = 'A\r\nB\r\nC';
+      for (const normalizedPos of [0, 2, 4]) {
+        const orig = mapNormalizedToOriginal(normalizedPos, original);
+        expect(mapOriginalToNormalized(orig, original)).toBe(normalizedPos);
+      }
     });
   });
 });

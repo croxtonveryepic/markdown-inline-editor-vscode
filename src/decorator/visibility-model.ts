@@ -1,6 +1,7 @@
 import { Range, ThemeColor, type DecorationOptions, type Position, type TextEditor } from 'vscode';
 import type { DecorationRange, DecorationType } from '../parser';
 import { isMarkerDecorationType } from './decoration-categories';
+import { decorationIntersectsWindow, type RenderWindow } from './viewport-window';
 
 export type ScopeEntry = {
   startPos: number;
@@ -12,12 +13,19 @@ export type ScopeEntry = {
 type RangeFactory = (startPos: number, endPos: number, originalText: string) => Range | null;
 type FilteredDecoration = Range | DecorationOptions;
 
+/**
+ * @param window - Optional viewport render window. When provided, decorations
+ *   whose normalized range does not intersect the window are skipped, so the
+ *   filter/apply cost scales with the viewport rather than the whole document.
+ *   When `null`/omitted, every decoration is processed (prior behaviour).
+ */
 export function filterDecorationsForEditor(
   editor: TextEditor,
   decorations: DecorationRange[],
   scopes: ScopeEntry[],
   originalText: string,
-  rangeFactory: RangeFactory
+  rangeFactory: RangeFactory,
+  window?: RenderWindow | null
 ): Map<DecorationType, FilteredDecoration[]> {
   const selectedRanges: Range[] = [];
   const cursorPositions: Position[] = [];
@@ -102,6 +110,12 @@ export function filterDecorationsForEditor(
   };
 
   for (const decoration of decorations) {
+    // Viewport scoping: skip decorations outside the render window before the
+    // expensive position mapping in rangeFactory. Decorations crossing a window
+    // boundary still intersect and are kept.
+    if (window && !decorationIntersectsWindow(decoration, window)) {
+      continue;
+    }
     const range = rangeFactory(decoration.startPos, decoration.endPos, originalText);
     if (!range) continue;
     const isActiveLine = activeLines.size > 0 && activeLines.has(range.start.line);

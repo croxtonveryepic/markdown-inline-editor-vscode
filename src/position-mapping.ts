@@ -78,6 +78,42 @@ export function mapNormalizedToOriginal(normalizedPos: number, originalText?: st
 }
 
 /**
+ * Maps a position from original document text (may contain CRLF) to normalized
+ * text (LF only). This is the inverse of {@link mapNormalizedToOriginal}.
+ *
+ * Used to express viewport offsets (computed from the live document) in the same
+ * normalized coordinate space the parser emits decoration positions in, so the
+ * two can be compared without per-decoration position mapping.
+ *
+ * Matches the forward map: only `\r\n` pairs are collapsed (lone `\r` is treated
+ * as a normal character), so the two functions stay consistent.
+ *
+ * @param originalPos - Position in original document text
+ * @param originalText - Original document text (may contain CRLF)
+ * @returns Position in normalized (LF-only) text
+ *
+ * @example
+ * ```typescript
+ * const original = 'AB\r\nCD';   // CRLF
+ * mapOriginalToNormalized(4, original); // Returns 3 (C, one \r removed)
+ * ```
+ */
+export function mapOriginalToNormalized(originalPos: number, originalText?: string): number {
+  if (!originalText || !originalText.includes('\r\n')) {
+    return originalPos;
+  }
+
+  const limit = Math.min(originalPos, originalText.length);
+  let removed = 0;
+  for (let i = 0; i < limit; i++) {
+    if (originalText[i] === '\r' && originalText[i + 1] === '\n') {
+      removed++;
+    }
+  }
+  return originalPos - removed;
+}
+
+/**
  * Normalizes heading text to anchor format.
  * 
  * Converts heading text to the format used in markdown anchor links:

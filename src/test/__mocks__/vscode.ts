@@ -101,6 +101,11 @@ class MockTextDocument {
     return this.text;
   }
 
+  get lineCount(): number {
+    // Count line breaks consistently with offsetAt/positionAt (CRLF as one break).
+    return this.text.split(/\r\n|\r|\n/).length;
+  }
+
   lineAt(line: number): { text: string } {
     // Minimal subset of VS Code's TextDocument.lineAt used by tests.
     // Keep line splitting consistent with offsetAt (treat CRLF as single break).
@@ -180,6 +185,7 @@ class MockTextEditor {
   constructor(
     public document: MockTextDocument,
     public selections: MockSelection[],
+    public visibleRanges: MockRange[] = [],
   ) {
     this.selection = selections[0] ?? new MockSelection({ line: 0, character: 0 }, { line: 0, character: 0 });
   }
@@ -233,6 +239,7 @@ export const window = {
   showTextDocument: vi.fn(async (document: MockTextDocument) => new MockTextEditor(document, [])),
   onDidChangeActiveTextEditor: () => ({ dispose: () => {} }),
   onDidChangeTextEditorSelection: () => ({ dispose: () => {} }),
+  onDidChangeTextEditorVisibleRanges: () => ({ dispose: () => {} }),
   onDidChangeActiveColorTheme: () => ({ dispose: () => {} }),
 };
 

@@ -14,6 +14,11 @@ export function registerEventHandlers(
     vscode.window.onDidChangeTextEditorSelection((event) => {
       decorator.onSelectionChange(event.kind);
     }),
+    vscode.window.onDidChangeTextEditorVisibleRanges((event) => {
+      if (event.textEditor === vscode.window.activeTextEditor) {
+        decorator.onVisibleRangesChange();
+      }
+    }),
     vscode.workspace.onDidChangeTextDocument((event) => {
       if (event.document === vscode.window.activeTextEditor?.document) {
         decorator.updateDecorationsFromChange(event);

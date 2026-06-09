@@ -341,3 +341,64 @@ describe('filterDecorationsForEditor — basic cases', () => {
     expect(result.has('hide')).toBe(true);
   });
 });
+
+describe('filterDecorationsForEditor — viewport window scoping', () => {
+  const text = 'aaaa\n**b**\ncccc\n**d**\neeee';
+  // Offsets: line0 "aaaa" [0,4], \n=4, line1 "**b**" [5,10], \n=10,
+  //          line2 "cccc" [11,15], \n=15, line3 "**d**" [16,21], \n=21, line4 "eeee" [22,26]
+  const decs: DecorationRange[] = [
+    { startPos: 5, endPos: 7, type: 'hide' } as any, // line 1 opener
+    { startPos: 7, endPos: 8, type: 'bold' } as any, // line 1 content
+    { startPos: 8, endPos: 10, type: 'hide' } as any, // line 1 closer
+    { startPos: 16, endPos: 18, type: 'hide' } as any, // line 3 opener
+    { startPos: 18, endPos: 19, type: 'bold' } as any, // line 3 content
+    { startPos: 19, endPos: 21, type: 'hide' } as any, // line 3 closer
+  ];
+
+  it('processes only decorations intersecting the window', () => {
+    const editor = makeEditor(text, 0, 0);
+    // Window covers only line 1 (offsets ~5..11): excludes the line-3 bold.
+    const window = { startOffset: 5, endOffset: 11 };
+    const result = filterDecorationsForEditor(
+      editor as any,
+      decs,
+      [],
+      text,
+      (s, e, t) => simpleRangeFactory(s, e, t),
+      window,
+    );
+    const bold = result.get('bold') as any[];
+    expect(bold).toHaveLength(1); // only the line-1 bold
+    expect(bold[0].start.line).toBe(1);
+  });
+
+  it('keeps a decoration that crosses the window boundary', () => {
+    const editor = makeEditor(text, 0, 0);
+    // Window starts at offset 9, mid-way through the line-1 closer [8,10].
+    const window = { startOffset: 9, endOffset: 26 };
+    const result = filterDecorationsForEditor(
+      editor as any,
+      decs,
+      [],
+      text,
+      (s, e, t) => simpleRangeFactory(s, e, t),
+      window,
+    );
+    const hides = result.get('hide') as any[];
+    // line-1 closer [8,10] crosses the boundary and is kept, plus both line-3 hides.
+    expect(hides.length).toBe(3);
+  });
+
+  it('processes every decoration when window is null (backward compatible)', () => {
+    const editor = makeEditor(text, 0, 0);
+    const result = filterDecorationsForEditor(
+      editor as any,
+      decs,
+      [],
+      text,
+      (s, e, t) => simpleRangeFactory(s, e, t),
+      null,
+    );
+    expect((result.get('bold') as any[]).length).toBe(2);
+  });
+});

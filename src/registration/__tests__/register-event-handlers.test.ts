@@ -11,6 +11,7 @@ describe('registerEventHandlers', () => {
     const decorator = {
       setActiveEditor: vi.fn(),
       onSelectionChange: vi.fn(),
+      onVisibleRangesChange: vi.fn(),
       updateDecorationsForSelection: vi.fn(),
       updateDecorationsFromChange: vi.fn(),
       renameFile: vi.fn(),
@@ -27,13 +28,16 @@ describe('registerEventHandlers', () => {
 
     const disposables = registerEventHandlers(decorator as any, linkClickHandler as any);
 
-    expect(disposables).toHaveLength(6);
+    expect(disposables).toHaveLength(7);
   });
 
   it('routes editor and workspace events to the decorator', () => {
     let activeEditorListener: ((editor: vscode.TextEditor | undefined) => void) | undefined;
     let selectionListener:
       | ((event: { kind: vscode.TextEditorSelectionChangeKind }) => void)
+      | undefined;
+    let visibleRangesListener:
+      | ((event: { textEditor: vscode.TextEditor }) => void)
       | undefined;
     let documentChangeListener:
       | ((event: { document: vscode.TextDocument }) => void)
@@ -48,6 +52,10 @@ describe('registerEventHandlers', () => {
     }) as any;
     vscode.window.onDidChangeTextEditorSelection = vi.fn((listener) => {
       selectionListener = listener;
+      return { dispose: vi.fn() };
+    }) as any;
+    vscode.window.onDidChangeTextEditorVisibleRanges = vi.fn((listener) => {
+      visibleRangesListener = listener;
       return { dispose: vi.fn() };
     }) as any;
     vscode.workspace.onDidChangeTextDocument = vi.fn((listener) => {
@@ -71,6 +79,7 @@ describe('registerEventHandlers', () => {
     const decorator = {
       setActiveEditor: vi.fn(),
       onSelectionChange: vi.fn(),
+      onVisibleRangesChange: vi.fn(),
       updateDecorationsForSelection: vi.fn(),
       updateDecorationsFromChange: vi.fn(),
       renameFile: vi.fn(),
@@ -86,6 +95,7 @@ describe('registerEventHandlers', () => {
 
     activeEditorListener?.(editor);
     selectionListener?.({ kind: vscode.TextEditorSelectionChangeKind.Mouse });
+    visibleRangesListener?.({ textEditor: editor });
     documentChangeListener?.({ document });
     renameListener?.({
       files: [{ oldUri: vscode.Uri.file('/old.md'), newUri: vscode.Uri.file('/new.md') }],
@@ -95,6 +105,7 @@ describe('registerEventHandlers', () => {
     expect(decorator.onSelectionChange).toHaveBeenCalledWith(
       vscode.TextEditorSelectionChangeKind.Mouse
     );
+    expect(decorator.onVisibleRangesChange).toHaveBeenCalled();
     expect(decorator.updateDecorationsFromChange).toHaveBeenCalledWith({ document });
     expect(decorator.renameFile).toHaveBeenCalledWith('file:///old.md', 'file:///new.md');
   });

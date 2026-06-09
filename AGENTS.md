@@ -59,12 +59,13 @@ Before making changes:
 
 **Decoration System:**
 - `decorator/decoration-type-registry.ts` - Manages decoration type lifecycle
-- `decorator/visibility-model.ts` - 3-state filtering (Rendered/Ghost/Raw)
+- `decorator/visibility-model.ts` - 3-state filtering (Rendered/Ghost/Raw); skips decorations outside the viewport render window
+- `decorator/viewport-window.ts` - Computes the viewport render window (visible lines ± one page) so the filter/apply pass scales with the viewport, not the whole document
 - `decorator/checkbox-toggle.ts` - Handles checkbox clicks
 - `decorator/decoration-categories.ts` - Categorizes decoration types
 - `decorator/file-decoration-state.ts` - Persists and migrates per-file enable/disable state
 - `decorator/update-scheduler.ts` - Debounced and idle update scheduling
-- `decorator/selection-update-throttle.ts` - Coalesces rapid selection-change events (e.g. a held arrow key) so the decoration pass runs at most once per pass-worth of time
+- `decorator/selection-update-throttle.ts` - Coalesces rapid selection-change and scroll events (e.g. a held arrow key) so the decoration pass runs at most once per pass-worth of time
 - `decorator/editor-decoration-applier.ts` - Range creation, scope entry building, and decoration application helpers
 - `decorator/mermaid-update-coordinator.ts` - Async Mermaid rendering and decoration coordination
 
