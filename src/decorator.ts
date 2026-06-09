@@ -83,6 +83,17 @@ export class Decorator {
     PERFORMANCE_CONSTANTS.SELECTION_THROTTLE_MAX_MS
   );
 
+  /**
+   * Memoized scope entries for a single (uri, version). Building them maps every
+   * scope range through positionAt/CRLF mapping — O(document) and pure over the
+   * version-stable parse — so a held arrow key would otherwise rebuild identical
+   * entries on every selection pass. Recomputed only when the document or version
+   * changes (see {@link getScopeEntries}).
+   */
+  private scopeEntriesCache:
+    | { uri: string; version: number; entries: ScopeEntry[] }
+    | undefined;
+
   constructor(parseCache: MarkdownParseCache, workspaceState?: Memento) {
     this.parseCache = parseCache;
     this.fileDecorationState = new FileDecorationStateStore(workspaceState);
@@ -497,7 +508,7 @@ export class Decorator {
     mathRegions: MathRegion[];
   } {
     const entry = this.parseCache.get(document);
-    const scopeEntries = this.buildScopeEntries(entry.scopes, entry.text);
+    const scopeEntries = this.getScopeEntries(document, entry.scopes, entry.text);
     return {
       decorations: entry.decorations,
       scopes: scopeEntries,
@@ -505,6 +516,32 @@ export class Decorator {
       mermaidBlocks: entry.mermaidBlocks,
       mathRegions: entry.mathRegions,
     };
+  }
+
+  /**
+   * Returns scope entries for the document, memoized by (uri, version).
+   *
+   * Scope-entry building is O(document) and pure over the version-stable parse,
+   * so on the selection hot path — where the document is unchanged — the cached
+   * entries are reused instead of being rebuilt on every cursor move. The cache
+   * holds a single slot; a new uri or version misses and recomputes.
+   *
+   * @private
+   */
+  private getScopeEntries(
+    document: TextDocument,
+    scopes: ScopeRange[],
+    originalText: string
+  ): ScopeEntry[] {
+    const uri = document.uri.toString();
+    const version = document.version;
+    const cached = this.scopeEntriesCache;
+    if (cached && cached.uri === uri && cached.version === version) {
+      return cached.entries;
+    }
+    const entries = this.buildScopeEntries(scopes, originalText);
+    this.scopeEntriesCache = { uri, version, entries };
+    return entries;
   }
 
   private async updateMermaidDiagrams(
