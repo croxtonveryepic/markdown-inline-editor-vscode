@@ -11,6 +11,7 @@ import { checkRecommendedExtensions } from './recommendations';
 import { registerEventHandlers } from './registration/register-event-handlers';
 import { registerProviders } from './registration/register-providers';
 import { disposeLogger } from './logging';
+import { registerLocalDeploymentReload } from './local-deployment-reload';
 
 /**
  * Public API exposed via `vscode.extensions.getExtension(id).exports`.
@@ -30,6 +31,10 @@ export type ExtensionApi = {
 };
 
 export function activate(context: vscode.ExtensionContext): ExtensionApi {
+  const deploymentReload = registerLocalDeploymentReload(context);
+  if (deploymentReload) {
+    context.subscriptions.push(deploymentReload);
+  }
   initMermaidRenderer(context);
 
   const parser = new MarkdownParser();

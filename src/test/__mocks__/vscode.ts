@@ -258,6 +258,7 @@ export class WorkspaceEdit {
 
 export const workspace = {
   onDidChangeTextDocument: () => ({ dispose: () => {} }),
+  onDidCloseTextDocument: () => ({ dispose: () => {} }),
   onDidChangeConfiguration: () => ({ dispose: () => {} }),
   onDidRenameFiles: () => ({ dispose: () => {} }),
   applyEdit: vi.fn().mockResolvedValue(true),

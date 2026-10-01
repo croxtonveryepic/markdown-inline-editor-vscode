@@ -2,6 +2,10 @@
 
 This document provides essential context and guidelines for AI agents working on this VS Code extension project. Follow these instructions to ensure your contributions align with project standards.
 
+## Jonathan's local deployment workflow
+
+After completing an extension runtime update in this workspace, run `npm run deploy-local` to test, lint, build, install, and verify the build in both Windows VS Code and the `Ubuntu-24.04` WSL VS Code server. This deployment is authorized as part of finishing each update; do not ask Jonathan to repeat the installation commands or approve the same local deployment again. Follow [docs/local-deployment.md](docs/local-deployment.md) for prerequisites, the one-time reload setup, and failure handling. Preserve all existing changes and the Git index. Do not deploy midway through an update or publish a marketplace release through this workflow.
+
 ## Quick Start Checklist
 
 Before making changes:

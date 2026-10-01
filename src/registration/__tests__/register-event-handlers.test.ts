@@ -28,7 +28,7 @@ describe('registerEventHandlers', () => {
 
     const disposables = registerEventHandlers(decorator as any, linkClickHandler as any);
 
-    expect(disposables).toHaveLength(7);
+    expect(disposables).toHaveLength(8);
   });
 
   it('routes editor and workspace events to the decorator', () => {
@@ -42,6 +42,7 @@ describe('registerEventHandlers', () => {
     let documentChangeListener:
       | ((event: { document: vscode.TextDocument }) => void)
       | undefined;
+    let documentCloseListener: ((document: vscode.TextDocument) => void) | undefined;
     let renameListener:
       | ((event: { files: Array<{ oldUri: vscode.Uri; newUri: vscode.Uri }> }) => void)
       | undefined;
@@ -60,6 +61,10 @@ describe('registerEventHandlers', () => {
     }) as any;
     vscode.workspace.onDidChangeTextDocument = vi.fn((listener) => {
       documentChangeListener = listener;
+      return { dispose: vi.fn() };
+    }) as any;
+    vscode.workspace.onDidCloseTextDocument = vi.fn((listener) => {
+      documentCloseListener = listener;
       return { dispose: vi.fn() };
     }) as any;
     vscode.workspace.onDidRenameFiles = vi.fn((listener) => {
@@ -82,6 +87,7 @@ describe('registerEventHandlers', () => {
       onVisibleRangesChange: vi.fn(),
       updateDecorationsForSelection: vi.fn(),
       updateDecorationsFromChange: vi.fn(),
+      clearCache: vi.fn(),
       renameFile: vi.fn(),
       updateDiffViewDecorationSetting: vi.fn(),
       recreateGhostFaintDecorationType: vi.fn(),
@@ -97,6 +103,8 @@ describe('registerEventHandlers', () => {
     selectionListener?.({ kind: vscode.TextEditorSelectionChangeKind.Mouse });
     visibleRangesListener?.({ textEditor: editor });
     documentChangeListener?.({ document });
+    const closedDocument = new (vscode.TextDocument as any)(vscode.Uri.file('/closed.md'), 'markdown', 1, '**old**');
+    documentCloseListener?.(closedDocument);
     renameListener?.({
       files: [{ oldUri: vscode.Uri.file('/old.md'), newUri: vscode.Uri.file('/new.md') }],
     });
@@ -107,6 +115,7 @@ describe('registerEventHandlers', () => {
     );
     expect(decorator.onVisibleRangesChange).toHaveBeenCalled();
     expect(decorator.updateDecorationsFromChange).toHaveBeenCalledWith({ document });
+    expect(decorator.clearCache).toHaveBeenCalledWith('file:///closed.md');
     expect(decorator.renameFile).toHaveBeenCalledWith('file:///old.md', 'file:///new.md');
   });
 

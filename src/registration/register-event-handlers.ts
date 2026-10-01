@@ -24,6 +24,9 @@ export function registerEventHandlers(
         decorator.updateDecorationsFromChange(event);
       }
     }),
+    vscode.workspace.onDidCloseTextDocument((document) => {
+      decorator.clearCache(document.uri.toString());
+    }),
     vscode.workspace.onDidRenameFiles((event) => {
       for (const { oldUri, newUri } of event.files) {
         decorator.renameFile(oldUri.toString(), newUri.toString());

@@ -31,14 +31,31 @@ describe('MarkdownParseCache', () => {
 
   it('reparses when document version changes', () => {
     const cache = new MarkdownParseCache(parser, 10);
-    const document1 = new TextDocument(Uri.file('/test.md'), 'markdown', 1, '**bold**');
-    const document2 = new TextDocument(Uri.file('/test.md'), 'markdown', 2, '*italic*');
+    const document = new TextDocument(Uri.file('/test.md'), 'markdown', 1, '**bold**');
 
-    const first = cache.get(document1);
-    const second = cache.get(document2);
+    const first = cache.get(document);
+    document.version = 2;
+    document.text = '*italic*';
+    const second = cache.get(document);
 
     expect(first).not.toBe(second);
     expect(second.version).toBe(2);
+    expect(second.text).toBe('*italic*');
+  });
+
+  it('reparses a reopened document with the same URI and version', () => {
+    const cache = new MarkdownParseCache(parser);
+    const original = new TextDocument(Uri.file('/test.md'), 'markdown', 1, '- The **agent** edits `blueprints`.');
+    const reopened = new TextDocument(Uri.file('/test.md'), 'markdown', 1, '1. The interview agent edits workflow blueprints.');
+
+    const first = cache.get(original);
+    const second = cache.get(reopened);
+
+    expect(second).not.toBe(first);
+    expect(second.text).toBe(reopened.getText());
+    expect(second.decorations).toEqual(parser.extractDecorations(reopened.getText()));
+    expect(second.decorations.some(({ type }) => type === 'code' || type === 'listItem')).toBe(false);
+    expect(cache.get(reopened)).toBe(second);
   });
 
   it('evicts least recently used entry when cache is full', () => {

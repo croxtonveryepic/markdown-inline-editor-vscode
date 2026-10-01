@@ -84,14 +84,14 @@ export class Decorator {
   );
 
   /**
-   * Memoized scope entries for a single (uri, version). Building them maps every
+   * Memoized scope entries for a single document, version, and parsed scopes. Building them maps every
    * scope range through positionAt/CRLF mapping — O(document) and pure over the
    * version-stable parse — so a held arrow key would otherwise rebuild identical
    * entries on every selection pass. Recomputed only when the document or version
    * changes (see {@link getScopeEntries}).
    */
   private scopeEntriesCache:
-    | { uri: string; version: number; entries: ScopeEntry[] }
+    | { document: TextDocument; version: number; scopes: ScopeRange[]; entries: ScopeEntry[] }
     | undefined;
 
   constructor(parseCache: MarkdownParseCache, workspaceState?: Memento) {
@@ -140,11 +140,10 @@ export class Decorator {
     // Drop any selection update still pending for the previous editor.
     this.selectionThrottle.cancel();
 
+    this.activeEditor = textEditor;
     if (!textEditor) {
       return;
     }
-
-    this.activeEditor = textEditor;
 
     // Update immediately when switching editors (no debounce)
     this.updateDecorationsForSelection();
@@ -519,12 +518,12 @@ export class Decorator {
   }
 
   /**
-   * Returns scope entries for the document, memoized by (uri, version).
+   * Returns scope entries memoized by document identity, version, and parsed scopes.
    *
    * Scope-entry building is O(document) and pure over the version-stable parse,
    * so on the selection hot path — where the document is unchanged — the cached
    * entries are reused instead of being rebuilt on every cursor move. The cache
-   * holds a single slot; a new uri or version misses and recomputes.
+   * holds a single slot; a new document, version, or scope array misses and recomputes.
    *
    * @private
    */
@@ -533,14 +532,13 @@ export class Decorator {
     scopes: ScopeRange[],
     originalText: string
   ): ScopeEntry[] {
-    const uri = document.uri.toString();
     const version = document.version;
     const cached = this.scopeEntriesCache;
-    if (cached && cached.uri === uri && cached.version === version) {
+    if (cached && cached.document === document && cached.version === version && cached.scopes === scopes) {
       return cached.entries;
     }
     const entries = this.buildScopeEntries(scopes, originalText);
-    this.scopeEntriesCache = { uri, version, entries };
+    this.scopeEntriesCache = { document, version, scopes, entries };
     return entries;
   }
 
@@ -650,6 +648,9 @@ export class Decorator {
    */
   clearCache(documentUri?: string): void {
     this.parseCache.clear(documentUri);
+    if (!documentUri || this.scopeEntriesCache?.document.uri.toString() === documentUri) {
+      this.scopeEntriesCache = undefined;
+    }
   }
 
   /**

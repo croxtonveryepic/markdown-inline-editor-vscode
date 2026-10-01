@@ -12,6 +12,7 @@ export type ParseEntry = {
 };
 
 type CacheEntry = ParseEntry & {
+  document: vscode.TextDocument;
   lastAccessed: number;
 };
 
@@ -24,7 +25,7 @@ export class MarkdownParseCache {
   get(document: vscode.TextDocument): ParseEntry {
     const cacheKey = document.uri.toString();
     const cached = this.cache.get(cacheKey);
-    if (cached && cached.version === document.version) {
+    if (cached && cached.document === document && cached.version === document.version) {
       cached.lastAccessed = ++this.accessCounter;
       logDebug('parse cache hit', { uri: cacheKey, version: document.version });
       return cached;
@@ -35,6 +36,7 @@ export class MarkdownParseCache {
     const { decorations, scopes, mermaidBlocks, mathRegions } = this.parser.extractDecorationsWithScopes(text);
     const parseDurationMs = Date.now() - parseStart;
     const entry: CacheEntry = {
+      document,
       version: document.version,
       text,
       decorations,
